@@ -1,0 +1,6 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Alive</title>
+<h1>Pages je živ ✅</h1>
+<p>Timestamp: <span id="t"></span></p>
+<script>document.getElementById('t').textContent=String(Date.now())</script>
