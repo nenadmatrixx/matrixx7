@@ -36,13 +36,15 @@
   .notes{margin-top:10px}
   .notes textarea{width:100%;min-height:90px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.18);color:#fff;padding:10px;font-size:16px}
   .actions{margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  @media (max-width:540px){ .content{font-size:16.5px} .tday{font-size:16px} .ttitle{font-size:14.5px} }
+  .err{position:fixed;left:0;right:0;top:0;z-index:9999;background:#3a1515;color:#ffd4d4;border-bottom:1px solid #6a2c2c;padding:10px 12px;font-size:13px;display:none}
 </style>
 </head>
 <body>
 <header>
   <h1>Matrixx 30 dana izazov</h1>
 </header>
+
+<div id="err" class="err"></div>
 
 <main>
   <div id="grid" class="grid"></div>
@@ -66,13 +68,14 @@
 </div>
 
 <script>
-/*** 0) KONFIG ***/
-// GAS URL:
-const API = 'https://script.google.com/macros/s/AKfycbw2AtMAeXudx-dIfF8nrGYn62KVa3rPhSB3HuFMGthF7hq97o3nabWG85fsGixWSHS2/exec';
-// Link za plaćanje (samo se vidi na premium danima kad su zaključani):
-const PAYMENT_URL = 'https://www.paypal.com/paypalme/nenadvip/20usd; // promeni po želji
+/*** 0) SIGURAN PayPal link — bez menjanja koda
+     (možeš ga poslati kroz ?pay= u URL-u) ***/
+const PAYMENT_URL = new URLSearchParams(location.search).get('pay') || 'https://paypal.me/tvojusername/20';
 
-/*** 1) FALLBACK ***/
+/*** 1) TVOJ GAS URL ***/
+const API = 'https://script.google.com/macros/s/AKfycbw2AtMAeXudx-dIfF8nrGYn62KVa3rPhSB3HuFMGthF7hq97o3nabWG85fsGixWSHS2/exec';
+
+/*** 2) FALLBACK ***/
 const FALLBACK = [
   {day:0,title:'Uvod',body:'7-DNEVNI MATRIXX IZAZOV — Reprogramiranje identiteta za 10 minuta dnevno.\nMatrixx podiže nivo svesti; viši nivo = bolje odluke, emocije, odnosi.\nMetafora nebodera: što si više, šira slika. Cilj: iz mehaničnog u svesno, sprat po sprat.',lockedAfterHours:0,paidTier:'free'},
   {day:1,title:'Dan 1 — Zaključavanje nogu',body:'Nikada ne prekrštajte noge dok sedite (kod kuće, na poslu, u javnosti).\nZašto: prekrštanje je nesvesni obrazac koji vraća stari identitet. Promena počinje razbijanjem posturalnih petlji. 7 dana: sedite drugačije.',lockedAfterHours:12,paidTier:'free'},
@@ -84,12 +87,11 @@ const FALLBACK = [
   {day:7,title:'Dan 7 — Svesno jedenje',body:'Pojedite ceo obrok u tišini: bez telefona i razgovora.\nPosmatrajte pokrete, ukus, senzacije i reakcije uma.',lockedAfterHours:12,paidTier:'free'},
 ];
 
-/*** 2) STATE + RESET + PREMIUM ***/
-const LS='mx7_state_v4';
+/*** 3) STATE ***/
+const LS='mx7_state_v5';
 const qs=new URLSearchParams(location.search);
 if(qs.get('reset')==='1'){ try{ localStorage.removeItem(LS); localStorage.removeItem('mx7_content_cache'); }catch{} }
 if(qs.get('pro')==='1'){ const s=S(); s.premium=true; W(s); }
-
 const $=q=>document.querySelector(q);
 function S(){ try{return JSON.parse(localStorage.getItem(LS)||'{}')}catch{return{}} }
 function W(v){ localStorage.setItem(LS, JSON.stringify(v)); }
@@ -97,7 +99,6 @@ function ensureStarted(h){ const s=S(); if(!s.startedAt){ s.startedAt=Date.now()
 function isDone(d){ const s=S(); return !!(s.done&&s.done[d]); }
 function markDone(d,v){ const s=S(); if(!s.done)s.done={}; s.done[d]=!!v; W(s); }
 function hasPremium(){ const s=S(); return !!s.premium; }
-
 function unlockAt(day, items){
   const s=S(); if(!s.startedAt) return null; let acc=0;
   for(let d=2; d<=day; d++){ const prev=items.find(x=>x.day===d-1); const h=(prev && Number(prev.lockedAfterHours))||12; acc+=h; }
@@ -106,7 +107,7 @@ function unlockAt(day, items){
 function isUnlockedByTime(day, items){ if(day===1) return true; const t=unlockAt(day,items); return t && Date.now()>=t; }
 function timeLeft(ms){ if(ms<=0)return'00:00:00'; const s=Math.floor(ms/1000); const h=String(Math.floor(s/3600)).padStart(2,'0'); const m=String(Math.floor((s%3600)/60)).padStart(2,'0'); const ss=String(s%60).padStart(2,'0'); return `${h}:${m}:${ss}`; }
 
-/*** 3) LOAD: GAS → cache → fallback ***/
+/*** 4) LOAD: GAS → cache → fallback ***/
 async function loadItems(){
   try{
     const r=await fetch(API+'?route=content',{cache:'no-store'});
@@ -130,18 +131,11 @@ async function loadItems(){
   }
 }
 
-/*** 4) AUDIO (blagi klik/unlock) ***/
-let ac;
-function tone(freq=660,dur=0.09,g=0.04){ try{
-  ac=ac||new (window.AudioContext||window.webkitAudioContext)();
-  const o=ac.createOscillator(), v=ac.createGain();
-  o.type='sine'; o.frequency.value=freq; v.gain.value=g; v.connect(ac.destination);
-  o.connect(v); o.start(); v.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+dur); o.stop(ac.currentTime+dur);
-}catch{}}
-function clickS(){ tone(660,0.08,0.05) }
-function unlockS(){ tone(440,0.12,0.06); setTimeout(()=>tone(880,0.12,0.05),90) }
+/*** 5) SOUND ***/
+let ac; function tone(f=660,d=0.09,g=0.04){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); const o=ac.createOscillator(), v=ac.createGain(); o.type='sine'; o.frequency.value=f; v.gain.value=g; v.connect(ac.destination); o.connect(v); o.start(); v.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+d); o.stop(ac.currentTime+d);}catch{} }
+function clickS(){ tone(660,0.08,0.05) } function unlockS(){ tone(440,0.12,0.06); setTimeout(()=>tone(880,0.12,0.05),90) }
 
-/*** 5) RENDER ***/
+/*** 6) RENDER ***/
 function normalizeRange(listRaw){
   const max = Math.max(7, ...listRaw.map(x=>x.day||0));
   const by=new Map(listRaw.map(x=>[Number(x.day)||0,x]));
@@ -167,10 +161,10 @@ function render(listRaw){
   const list=normalizeRange(listRaw);
   const g=$('#grid'); g.innerHTML='';
 
-  // UVOD — minimalistički
+  // Uvod minimalno
   g.appendChild(tileUvod(list.find(x=>x.day===0)));
 
-  const nextD = nextLockedDay(list); // tajmer samo za sledeći zaključani besplatni dan
+  const nextD = nextLockedDay(list); // tajmer samo za prvi zaključani free dan
 
   list.filter(x=>x.day>=1).forEach(it=>{
     g.appendChild(tileDan(it,list,nextD));
@@ -186,17 +180,12 @@ function tileUvod(intro){
   el.querySelector('.btn').onclick=()=>{ clickS(); openLesson(0,intro); };
   return el;
 }
-
 function tileDan(it, all, nextLocked){
   const d=Number(it.day)||0;
   const open = canOpen(it, all);
   const isPrem = it.paidTier==='premium';
-
   const el=document.createElement('div'); el.className='tile';
-  const badges = [];
-  if(open) badges.push(`<div class="status okb">OTKLJUČANO</div>`); else badges.push(`<div class="status lockb">ZAKLJUČANO</div>`);
-  if(isPrem) badges.push(`<div class="status premium">PREMIUM</div>`);
-
+  const badges=[]; badges.push(`<div class="status ${open?'okb':'lockb'}">${open?'OTKLJUČANO':'ZAKLJUČANO'}</div>`); if(isPrem) badges.push(`<div class="status premium">PREMIUM</div>`);
   el.innerHTML=`
     <div style="display:flex;gap:8px;flex-wrap:wrap">${badges.join('')}</div>
     <div class="tday">Dan ${d}</div>
@@ -210,7 +199,6 @@ function tileDan(it, all, nextLocked){
       <button class="btn" ${open?'':'disabled'}>Otvori</button>
       ${(!open && isPrem && !hasPremium()) ? `<button class="btn gold buy">Otključaj Premium</button>`:''}
     </div>`;
-
   if(open){
     el.querySelector('.btn').onclick=()=>{ clickS(); openLesson(d,it); };
   }else{
@@ -225,7 +213,7 @@ function tileDan(it, all, nextLocked){
   return el;
 }
 
-/*** 6) MODAL ***/
+/*** 7) MODAL ***/
 let currentDay=null;
 function openLesson(day, it){
   if(day===1 && !S().startedAt){ ensureStarted(Number(it.lockedAfterHours)||12); setTimeout(()=>render(currentItems),0); }
@@ -241,12 +229,17 @@ document.getElementById('close').onclick=()=>show(false);
 document.getElementById('done').onchange=e=>{ markDone(currentDay,e.target.checked); clickS(); } ;
 document.getElementById('nt').oninput=e=>localStorage.setItem(LS+'_notes_'+currentDay,e.target.value||'');
 
-/*** 7) INIT ***/
+/*** 8) INIT + DIJAGNOSTIKA ***/
+function showError(msg){ const b=document.getElementById('err'); b.textContent='Greška: '+msg; b.style.display='block'; }
+window.addEventListener('error',e=>{ showError(e.message||'Nepoznata greška'); });
+
 let currentItems=FALLBACK;
 (async function(){
-  const items=await loadItems();
-  currentItems=items;
-  render(items);
+  try{
+    const items=await loadItems();
+    currentItems=items;
+    render(items);
+  }catch(e){ showError(e.message||String(e)); }
 })();
 </script>
 </body>
