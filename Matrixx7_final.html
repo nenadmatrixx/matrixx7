@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Matrixx 7</title>
+<style>
+  :root{
+    --bg:#0f1722; --panel:#0f1b2c; --line:#24364e; --muted:#9fb0c9; --text:#eef5ff;
+    --green:#2fa36a; --green-bg:#0e3725; --red:#d75555; --red-bg:#401b1b;
+    --tile:#101827; --tile-hi:#152339; --accent:#163d6b; --accent2:#1d518e;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%; margin:0; background:var(--bg); color:var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;}
+  .app{min-height:100%; display:grid; grid-template-rows:auto 1fr}
+  header{padding:14px 16px; border-bottom:1px solid var(--line); background:linear-gradient(90deg,#0f1b2c,#0c1a2b)}
+  h1{margin:0; font-size:22px; font-weight:800}
+  .sub{color:var(--muted); font-size:14px}
+  .bar{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; align-items:center}
+  .btn{background:#0c141c; border:1px solid #2a3b4e; border-radius:10px; color:#fff; padding:10px 14px; font-size:15px; cursor:pointer}
+  .btn:disabled{opacity:.5; cursor:not-allowed}
+  .main{padding:12px; display:grid; gap:12px}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px}
+  h2{margin:0 0 8px 0; color:#d6e7fb; letter-spacing:.3px; font-size:14px; text-transform:uppercase}
+  .muted{color:var(--muted)}
+  .right{margin-left:auto}
+  .progressBar{width:180px; height:8px; border-radius:999px; background:#0b1624; border:1px solid #24364e; overflow:hidden}
+  .progressFill{height:100%; width:0%; background:linear-gradient(90deg,#3fa3ff,#6be7c1)}
+
+  .grid{display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));}
+  .tile{position:relative; padding:18px; border:1px solid #2a3b4e; border-radius:16px; background:var(--tile); box-shadow:0 10px 30px rgba(0,0,0,.25); overflow:hidden}
+  .tile.unlocked{border-color:#2c6a45; background:linear-gradient(180deg, var(--tile), var(--tile-hi)); box-shadow:0 10px 30px rgba(47,163,106,.25)}
+  .tile.locked{border-color:#6a2c2c; background:linear-gradient(180deg, var(--tile), #181520); box-shadow:0 10px 30px rgba(215,85,85,.18)}
+  .status{display:inline-block; padding:4px 12px; border-radius:999px; font-size:13px; border:1px solid #2a3b4e}
+  .status.ok{background:var(--green-bg); color:#baf4ce; border-color:#2c6a45}
+  .status.lock{background:var(--red-bg); color:#ffc9c9; border-color:#6a2c2c}
+  .tday{font-size:20px; font-weight:800; margin:6px 0 8px 0}
+  .ttitle{font-size:16px; font-weight:700}
+  .tlock{font-size:13px; color:#ffcfbf; margin-top:6px}
+  .countdown{font-weight:700; color:#ffd29e}
+  .tprogress{font-size:13px; color:#cfe0f4; margin-top:8px}
+  .cta{margin-top:12px} .cta .btn{width:100%}
+
+  @keyframes pop { 0%{transform:scale(0.94)} 60%{transform:scale(1.03)} 100%{transform:scale(1)} }
+  .pop{animation: pop 380ms ease-out}
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-3px)} 75%{transform:translateX(3px)} }
+  .shake{animation: shake 280ms ease-in-out}
+
+  /* Toast */
+  .toast{position:fixed; bottom:14px; left:50%; transform:translateX(-50%); background:#0f1722; border:1px solid #2a3b4e; padding:10px 12px; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.35); display:none; z-index:120}
+
+  /* Modali */
+  .overlay{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; z-index:100}
+  .lesson-modal{position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:min(560px, 94vw); max-height:88vh;
+    background:linear-gradient(180deg,var(--accent),var(--accent2)); border:1px solid #2a3b4e; border-radius:16px; padding:14px; z-index:110; display:none; box-shadow:0 18px 60px rgba(0,0,0,.45);
+    display:none; flex-direction:column; min-height:0}
+  .lesson-modal.show{display:flex;}
+  .lesson-modal h3{margin:0 0 10px 0; font-size:18px; display:flex; align-items:center; justify-content:space-between}
+  .xbtn{background:transparent; border:0; cursor:pointer; width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px}
+  .xbtn:hover{background:rgba(0,0,0,.2)}
+  .lesson-content{white-space:pre-wrap; font-size:17px; line-height:1.65; background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:12px; flex:1 1 auto; min-height:0; overflow:auto}
+  .notes{margin-top:10px}
+  .notes textarea{width:100%; min-height:90px; border-radius:10px; border:1px solid rgba(255,255,255,.14); background:rgba(0,0,0,.18); color:#fff; padding:10px; font-size:16px; resize:vertical}
+  .lesson-actions{margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .check{display:flex; align-items:center; gap:8px; font-size:16px}
+  @media (max-width:540px){ .lesson-modal{width:96vw; max-height:92vh} .lesson-content{font-size:16.5px} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div>
+        <h1>Matrixx 7</h1>
+        <div class="sub">Dan 1 je odmah otključan • Ostali dani se otključavaju na 12h od prvog otvaranja Dana 1.</div>
+      </div>
+      <div class="right" aria-label="Napredak">
+        <div class="progressBar" aria-hidden="true"><div class="progressFill" id="progFill"></div></div>
+      </div>
+    </div>
+    <div class="bar">
+      <button class="btn" id="btnIntro" aria-label="Uvod">Uvod</button>
+    </div>
+  </header>
+
+  <section class="main" aria-live="polite">
+    <div class="panel">
+      <h2>Plan i napredak</h2>
+      <div class="muted" id="progressTxt">Napredak: 0%</div>
+    </div>
+
+    <div class="panel">
+      <h2>Putanja</h2>
+      <div class="grid" id="tiles"></div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<!-- Intro modal -->
+<div class="overlay" id="introOv"></div>
+<div class="lesson-modal" id="introMd" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+  <h3 id="introTitle">
+    UVOD
+    <button class="xbtn" id="introClose" aria-label="Zatvori uvod">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </h3>
+  <div class="lesson-content" id="introBody"></div>
+  <div class="lesson-actions">
+    <button class="btn" id="introStart">Započni</button>
+  </div>
+</div>
+
+<!-- Lesson modal -->
+<div class="overlay" id="lessonOv"></div>
+<div class="lesson-modal" id="lessonMd" role="dialog" aria-modal="true" aria-labelledby="lessonTitle">
+  <h3 id="lessonTitle">
+    Vežba
+    <button class="xbtn" id="btnCloseLesson" aria-label="Zatvori vežbu">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </h3>
+  <div class="lesson-content" id="lessonBody">...</div>
+  <div class="notes">
+    <label for="notesArea">Šta sam primetio danas?</label>
+    <textarea id="notesArea" placeholder="Brza beleška (auto-čuvanje)"></textarea>
+  </div>
+  <div class="lesson-actions">
+    <label class="check"><input type="checkbox" id="chkDone" aria-label="Pročitano"> Pročitano</label>
+  </div>
+</div>
+
+<script>
+/* ——— Tekstovi ——— */
+const INTRO = `🔷 7-DNEVNI MATRIXX IZAZOV
+Reprogramiranje identiteta za 10 minuta dnevno
+
+Matrixx je sistem osmišljen da reprogramira vaš identitet za samo 10 minuta dnevno, transformišući način na koji mislite, osećate i delujete. Svaka Matrixx vežba podiže vaš nivo svesti. Kada podignete svest, svaki aspekt života se poboljšava: vaši odnosi postaju harmoničniji, emocije se smiruju, a finansije i zdravlje se usklađuju. Svi rezultati potiču iz jednog izvora — vašeg stanja svesti.
+
+🏙 Metafora nebodera
+Zamislite zgradu od 10 spratova. Živeti u prizemlju znači živeti nesvesno — bez svesti o sebi i okolini. Pogled vam je ograničen, svetla je malo i sve izgleda konfuzno. Na 5. spratu stvari postaju jasnije. Na 10. spratu ceo vaš svet se menja. Cilj Matrixx izazova je da vas iz mehaničkog života podigne u svesno prisustvo — sprat po sprat.`;
+
+const DAYS = {
+  1: `🃏 Dan 1 — Zaključavanje nogu
+
+Uputstvo: nikada ne prekrštajte noge dok sedite — kod kuće, na poslu, u javnosti.
+
+Zašto: prekrštanje nogu je nesvesni obrazac koji vas vraća starom identitetu, starim emocijama i poznatim ograničenjima. Promena počinje razbijanjem posturalnih petlji. Novo prisustvo znači novu frekvenciju. Tokom 7 dana sedite drugačije. Birajte ko postajete — jedno sedenje po jedno.`,
+  2: `🃏 Dan 2 — Ritual koraka
+
+Uputstvo: desna noga ulazi kroz svaka vrata. Leva noga ulazi kroz vrata toaleta. Ponavljajte dok ne zaboravite — pa krenite ponovo.
+
+Zašto: videćete koliko malo živite svesno. Svaki zaboravljen korak je ogledalo, a svaki zapamćen korak iskra svesti. Vremenom se pokreti preoblikuju u svesnost. Postajete gospodar pragova — između sna i prisustva.`,
+  3: `🃏 Dan 3 — „Ja jesam” kvaka
+
+Uputstvo: svaki put kada dodirnete kvaku, tiho recite: „Ja jesam”.
+
+Zašto: reči vas ne menjaju — svest to čini. Osetite ruku, dodir i sopstveno prisustvo. Ovaj mikro-trenutak vraća vas u sada. Svaka kvaka postaje portal nazad ka sebi.`,
+  4: `🃏 Dan 4 — Podeljena pažnja
+
+Uputstvo: dok razgovarate sa nekim, deo pažnje stavite na svoje desno stopalo. Primetite pritisak i senzacije.
+
+Zašto: gubimo sebe kada 100% pažnje ide spolja. Podeljena pažnja gradi unutrašnje prisustvo. Ostanite sa njima — i sa sobom. Ova suptilna praksa menja energiju, fokus i autoritet.`,
+  5: `🃏 Dan 5 — Budilnik na sat vremena
+
+Uputstvo: od 08:00 do 20:00, na početku svakog sata, zastanite i tiho recite: „Ja jesam”.
+
+Zašto: dan je često maglovit. Ovaj ritual seče vreme kao zvono. Svaki sat postaje kontrolna tačka svesti. Probudi se. Udahni. Vrati se.`,
+  6: `🃏 Dan 6 — Prekidač mentalnih petlji
+
+Uputstvo: brojte polako od 1 do 50, zatim nazad od 50 do 1. Ponovite 5 puta.
+
+Zašto: um će se opirati, odvlačiti vas i prekidati. Ako istrajete, mentalna buka se stišava. Ostaju samo brojevi — i prisustvo. Snažan alat protiv anksioznosti, preteranog razmišljanja i panike.`,
+  7: `🃏 Dan 7 — Svesno jedenje
+
+Uputstvo: pojedite ceo obrok u tišini. Bez telefona. Bez razgovora. Samo prisustvo.
+
+Zašto: jedenje je često mehaničko — danas postaje sveto. Posmatrajte svaki pokret, ukus i senzaciju. Primetite kako um reaguje. Ovaj obrok je meditacija.`
+};
+
+/* ——— Pomoćne ——— */
+const $ = (q)=>document.querySelector(q);
+function toast(msg, ms=1400){ const t=$('#toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none',ms); }
+function timeLeft(ms){ if(ms<=0) return '00:00:00'; const s=Math.floor(ms/1000); const h=String(Math.floor(s/3600)).padStart(2,'0'); const m=String(Math.floor((s%3600)/60)).padStart(2,'0'); const ss=String(s%60).padStart(2,'0'); return h+':'+m+':'+ss; }
+
+/* ——— Zvuk (suptilan, bez prekidača) ——— */
+let audioCtx=null;
+function ensureAudio(){ if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); } }
+function clickBeep(freq=520, ms=100, vol=0.035){
+  try{
+    ensureAudio(); if(audioCtx.state==='suspended') audioCtx.resume();
+    const ctx=audioCtx; const o=ctx.createOscillator(); const g=ctx.createGain();
+    o.type='sine'; o.frequency.value=freq; o.connect(g); g.connect(ctx.destination);
+    g.gain.value=vol; o.start(); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + ms/1000); o.stop(ctx.currentTime + ms/1000);
+  }catch(e){}
+}
+
+/* ——— State & otključavanje ——— */
+const LS='mx7_final_unlock_12h_v2';
+const TWELVE_H = 12*60*60*1000;
+const now = ()=>Date.now();
+const S = ()=>{ try{return JSON.parse(localStorage.getItem(LS)||'{}')}catch{return {}} };
+const W = (s)=>localStorage.setItem(LS, JSON.stringify(s));
+
+function ensureStarted(){
+  const s=S();
+  if(!s.startedAt){ s.startedAt = now(); if(!s.done) s.done = {}; W(s); }
+}
+function isUnlocked(day){
+  if(day===1) return true;
+  const s=S(); if(!s.startedAt) return false;
+  const ua = s.startedAt + (day-1)*TWELVE_H;
+  return now() >= ua;
+}
+function unlockAt(day){
+  const s=S(); if(!s.startedAt) return null;
+  return s.startedAt + (day-1)*TWELVE_H;
+}
+function isDayDone(day){ const s=S(); return !!(s.done && s.done[day]); }
+function setDayDone(day,val){ const s=S(); if(!s.done) s.done={}; s.done[day]=!!val; W(s); renderHeader(); }
+function progressPct(){ const s=S(); let c=0; for(let d=1; d<=7; d++) if(s.done && s.done[d]) c++; return Math.round(100*c/7); }
+function firstNotUnlocked(){ for(let d=1; d<=7; d++){ if(!isUnlocked(d)) return d; } return null; }
+
+/* ——— Render ——— */
+function renderHeader(){
+  $('#progressTxt').textContent = 'Napredak: '+progressPct()+'%';
+  $('#progFill').style.width = progressPct()+'%';
+}
+
+function renderTiles(){
+  const grid = $('#tiles'); grid.innerHTML='';
+  const nextL = firstNotUnlocked();
+
+  // UVOD
+  const introTile = document.createElement('div');
+  introTile.className='tile unlocked';
+  introTile.innerHTML = `
+    <div class="status ok">UVOD</div>
+    <div class="tday">Uvod</div>
+    <div class="ttitle">O čemu je Matrixx</div>
+    <div class="tprogress">Status: spremno</div>
+    <div class="cta"><button class="btn">Otvori</button></div>`;
+  introTile.querySelector('.btn').addEventListener('click',()=>{ clickBeep(); openIntro(); });
+  grid.appendChild(introTile);
+
+  // DANI 1–7
+  for(let d=1; d<=7; d++){
+    const unlocked = isUnlocked(d);
+    const tile = document.createElement('div');
+    tile.className = 'tile ' + (unlocked ? 'unlocked' : 'locked');
+    const statusClass = unlocked ? 'ok' : 'lock';
+    tile.innerHTML = `
+      <div class="status ${statusClass}">${unlocked?'OTKLJUČANO':'ZAKLJUČANO'}</div>
+      <div class="tday">Dan ${d}</div>
+      <div class="ttitle">Vežba</div>
+      <div class="tlock"><span class="countdown"></span></div>
+      <div class="tprogress">${isDayDone(d) ? 'Status: završeno' : (unlocked ? 'Status: spremno' : 'Status: zaključano')}</div>
+      <div class="cta"><button class="btn" ${unlocked?'':'disabled'}>${unlocked?'Otvori vežbu':'Zaključano'}</button></div>
+    `;
+    const btn = tile.querySelector('.btn');
+    const cd = tile.querySelector('.countdown');
+    // Prikaži tajmer samo za prvi zaključani dan i samo u okviru 12h
+    const ua = unlockAt(d);
+    const showCd = (!unlocked) && (firstNotUnlocked()===d) && ua && (ua - now() <= TWELVE_H);
+    if(showCd){ cd.textContent = 'Otključava se za ' + timeLeft(Math.max(0, ua - now())); }
+
+    btn.addEventListener('click', ()=>{
+      if(unlocked){
+        clickBeep();
+        if(d===1) ensureStarted(); // start izazova pri prvom otvaranju Dana 1
+        openLesson(d);
+      }else{
+        tile.classList.add('shake'); setTimeout(()=>tile.classList.remove('shake'), 320);
+        toast('Još je zaključano');
+      }
+    });
+
+    grid.appendChild(tile);
+  }
+}
+
+/* ——— Modali ——— */
+function showIntro(show){ $('#introOv').style.display = show?'block':'none'; const md=$('#introMd'); md.classList.toggle('show', show); }
+function showLesson(show){ $('#lessonOv').style.display = show?'block':'none'; const md=$('#lessonMd'); md.classList.toggle('show', show); }
+
+function openIntro(){
+  $('#introBody').textContent = INTRO;
+  showIntro(true);
+}
+$('#introClose').addEventListener('click',()=> showIntro(false));
+$('#btnIntro').addEventListener('click',()=> openIntro());
+$('#introStart').addEventListener('click',()=>{ ensureStarted(); showIntro(false); renderTiles(); renderHeader(); });
+
+let currentDay=null;
+function openLesson(day){
+  currentDay = day;
+  $('#lessonTitle').childNodes[0].nodeValue = 'Vežba — Dan ' + day + ' ';
+  $('#lessonBody').textContent = DAYS[day] || 'Nema teksta.';
+  $('#notesArea').value = localStorage.getItem(LS+'_notes_'+day) || '';
+  $('#chkDone').checked = isDayDone(day);
+  showLesson(true);
+}
+$('#btnCloseLesson').addEventListener('click',()=> showLesson(false));
+$('#chkDone').addEventListener('change',(e)=> setDayDone(currentDay, e.target.checked));
+$('#notesArea').addEventListener('input',(e)=> localStorage.setItem(LS+'_notes_'+currentDay, e.target.value||''));
+
+/* ——— Init (bez ijednog auto-popup-a) ——— */
+(function init(){
+  renderTiles(); renderHeader();
+  // interval za osvežavanje tajmera i auto-otključavanje
+  setInterval(()=>{
+    renderHeader();
+    const tiles = Array.from($('#tiles').children).slice(1); // preskačemo Uvod
+    const nextL = firstNotUnlocked();
+    for(let i=0;i<tiles.length;i++){
+      const d = i+1;
+      const node = tiles[i];
+      const status=node.querySelector('.status'); const btn=node.querySelector('.btn'); const cd=node.querySelector('.countdown');
+      const unlocked=isUnlocked(d);
+      if(unlocked && status.classList.contains('lock')){
+        node.classList.remove('locked'); node.classList.add('unlocked'); node.classList.add('pop');
+        status.className='status ok'; status.textContent='OTKLJUČANO'; btn.disabled=false; btn.textContent='Otvori vežbu';
+        cd.textContent='';
+      }
+      if(!unlocked){
+        const ua=unlockAt(d); const show=(nextL===d) && ua && (ua - now() <= TWELVE_H);
+        cd.textContent = show ? ('Otključava se za '+ timeLeft(Math.max(0, ua - now()))) : '';
+      } else {
+        cd.textContent = '';
+      }
+    }
+  }, 1000);
+})();
+</script>
+</body>
+</html>
