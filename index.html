@@ -24,6 +24,7 @@
   .btn{display:inline-block;background:#0c141c;border:1px solid #2a3b4e;color:#fff;border-radius:10px;padding:10px 12px;cursor:pointer}
   .btn[disabled]{opacity:.5;cursor:not-allowed}
   .btn.gold{border-color:#7a5b1b;background:rgba(246,196,83,.1)}
+  /* Modal */
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:90}
   .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.98);
     width:min(560px,94vw);max-height:90vh;background:#133156;border:1px solid #29466d;border-radius:14px;padding:12px;display:none;z-index:100;opacity:0;transition:opacity .2s,transform .2s}
@@ -35,11 +36,19 @@
   .notes{margin-top:10px}
   .notes textarea{width:100%;min-height:90px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.18);color:#fff;padding:10px;font-size:16px}
   .actions{margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  /* mini modal za token / info */
   .mini{width:min(420px,92vw)}
   .field{display:flex;gap:8px}
   .field input{flex:1 1 auto;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.2);color:#fff;padding:10px 12px;font-size:16px}
   .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0c2a1a;border:1px solid #2e5b3e;color:#c4ffd8;padding:10px 14px;border-radius:10px;opacity:0;transition:opacity .2s}
   .toast.show{opacity:1}
+  /* konfete */
+  .confetti{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:200}
+  .confetti .p{position:absolute;width:8px;height:12px;opacity:.95;border-radius:2px;will-change:transform,opacity}
+  @keyframes fall {
+    0% { transform:translateY(-10vh) rotate(0deg) }
+    100% { transform:translateY(110vh) rotate(720deg) }
+  }
   @media (max-width:540px){ .content{font-size:16.4px} .tday{font-size:16px} }
 </style>
 </head>
@@ -52,6 +61,10 @@
   <div id="grid" class="grid"></div>
 </main>
 
+<!-- konfete sloj -->
+<div id="fx" class="confetti" aria-hidden="true"></div>
+
+<!-- modal vežbe -->
 <div id="ov" class="overlay"></div>
 <div id="md" class="modal" role="dialog" aria-modal="true" aria-labelledby="ttl">
   <h3><span id="ttl">Vežba</span>
@@ -69,7 +82,7 @@
   </div>
 </div>
 
-<!-- mini modal za token -->
+<!-- mini modal: token -->
 <div id="ov2" class="overlay"></div>
 <div id="md2" class="modal mini" role="dialog" aria-modal="true" aria-labelledby="ttl2">
   <h3><span id="ttl2">Unesi premium token</span>
@@ -84,10 +97,24 @@
   <div id="tokMsg" class="info" style="margin-top:8px"></div>
 </div>
 
+<!-- mini modal: info za Dan 8 -->
+<div id="ov3" class="overlay"></div>
+<div id="md3" class="modal mini" role="dialog" aria-modal="true" aria-labelledby="ttl3">
+  <h3><span id="ttl3">Premium od Dana 8</span>
+    <button class="xbtn" id="close3" aria-label="Zatvori">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </h3>
+  <div class="content" style="min-height:120px">
+    Od Dana 8 do 30 nalaze se napredne vežbe i vodiči.<br><br>
+    Otključavanjem Premium paketa dobijaš kontinuirani napredak, dodatne mikro-rutine i strukturu do 30. dana.
+  </div>
+</div>
+
 <div id="t" class="toast">Premium aktiviran ✅</div>
 
 <script>
-/*** PayPal (možeš menjati i preko &pay= u URL-u) ***/
+/*** PayPal (može i &pay= u URL-u) ***/
 const PAYMENT_URL = new URLSearchParams(location.search).get('pay')
   || 'https://www.paypal.com/paypalme/nenadvip/20usd';
 
@@ -97,17 +124,17 @@ const API = 'https://script.google.com/macros/s/AKfycbw2AtMAeXudx-dIfF8nrGYn62KV
 /*** FALLBACK ***/
 const FALLBACK = [
   {day:0,title:'Uvod',body:'7-DNEVNI MATRIXX IZAZOV — Reprogramiranje identiteta za 10 minuta dnevno.\nMatrixx podiže nivo svesti; viši nivo = bolje odluke, emocije, odnosi.\nMetafora nebodera: što si više, šira slika. Cilj: iz mehaničnog u svesno, sprat po sprat.',lockedAfterHours:0,paidTier:'free'},
-  {day:1,title:'Dan 1',body:'Nikada ne prekrštajte noge dok sedite (kod kuće, na poslu, u javnosti).\nZašto: prekrštanje je nesvesni obrazac koji vraća stari identitet. Promena počinje razbijanjem posturalnih petlji. 7 dana: sedite drugačije.',lockedAfterHours:12,paidTier:'free'},
-  {day:2,title:'Dan 2',body:'Desna noga ulazi kroz svaka vrata; leva noga ulazi kroz vrata toaleta.\nPonavljajte—kad zaboravite, nastavite. Svaki zaborav je ogledalo mehaničnosti; svaki svesno izveden korak gradi prisustvo.',lockedAfterHours:12,paidTier:'free'},
-  {day:3,title:'Dan 3',body:'Svaki put kada dodirnete kvaku, tiho recite: „Ja Jesam.”\nOsetite ruku, dodir i prisustvo tela. Reči ne menjaju — svest menja.',lockedAfterHours:12,paidTier:'free'},
-  {day:4,title:'Dan 4',body:'Dok razgovarate sa nekim, deo pažnje stavite na desno stopalo (pritisak, senzacije).\nPodeljena pažnja gradi unutrašnje prisustvo i autoritet.',lockedAfterHours:12,paidTier:'free'},
-  {day:5,title:'Dan 5',body:'Od 8:00 do 20:00, na početku svakog sata, zastanite i recite: „Ja Jesam.”\nSvaki sat postaje kontrolna tačka svesti.',lockedAfterHours:12,paidTier:'free'},
-  {day:6,title:'Dan 6',body:'Polako brojite 1→50, pa 50→1. Ponovite 5×. Um će lutati — istrajte.\nBuka opada, ostaje brojanje i prisustvo.',lockedAfterHours:12,paidTier:'free'},
-  {day:7,title:'Dan 7',body:'Pojedite ceo obrok u tišini: bez telefona i razgovora.\nPosmatrajte pokrete, ukus, senzacije i reakcije uma.',lockedAfterHours:12,paidTier:'free'},
+  {day:1,title:'',body:'Nikada ne prekrštajte noge dok sedite (kod kuće, na poslu, u javnosti).\nZašto: prekrštanje je nesvesni obrazac koji vraća stari identitet. Promena počinje razbijanjem posturalnih petlji. 7 dana: sedite drugačije.',lockedAfterHours:12,paidTier:'free'},
+  {day:2,title:'',body:'Desna noga ulazi kroz svaka vrata; leva noga ulazi kroz vrata toaleta.\nPonavljajte—kad zaboravite, nastavite. Svaki zaborav je ogledalo mehaničnosti; svaki svesno izveden korak gradi prisustvo.',lockedAfterHours:12,paidTier:'free'},
+  {day:3,title:'',body:'Svaki put kada dodirnete kvaku, tiho recite: „Ja Jesam.”\nOsetite ruku, dodir i prisustvo tela. Reči ne menjaju — svest menja.',lockedAfterHours:12,paidTier:'free'},
+  {day:4,title:'',body:'Dok razgovarate sa nekim, deo pažnje stavite na desno stopalo (pritisak, senzacije).\nPodeljena pažnja gradi unutrašnje prisustvo i autoritet.',lockedAfterHours:12,paidTier:'free'},
+  {day:5,title:'',body:'Od 8:00 do 20:00, na početku svakog sata, zastanite i recite: „Ja Jesam.”\nSvaki sat postaje kontrolna tačka svesti.',lockedAfterHours:12,paidTier:'free'},
+  {day:6,title:'',body:'Polako brojite 1→50, pa 50→1. Ponovite 5×. Um će lutati — istrajte.\nBuka opada, ostaje brojanje i prisustvo.',lockedAfterHours:12,paidTier:'free'},
+  {day:7,title:'',body:'Pojedite ceo obrok u tišini: bez telefona i razgovora.\nPosmatrajte pokrete, ukus, senzacije i reakcije uma.',lockedAfterHours:12,paidTier:'free'},
 ];
 
 /*** STATE ***/
-const LS='mx7_state_v9';
+const LS='mx7_state_v10';
 const qs=new URLSearchParams(location.search);
 if(qs.get('reset')==='1'){ try{ localStorage.removeItem(LS); localStorage.removeItem('mx7_content_cache'); }catch{} }
 if(qs.get('pro')==='1'){ const s=S(); s.premium=true; W(s); }
@@ -150,59 +177,65 @@ async function loadItems(){
   }
 }
 
-/*** AUDIO — bez oscilatora, siguran one-shot buffer klik ***/
+/*** AUDIO — bez oscilatora, one-shot buffer, samo na klik (nema autoplay) ***/
 const AUDIO_ENABLED = !(/(?:snd=0|nosnd=1)/.test(location.search));
-const audio = { ctx:null, armed:false, buf:null, live:new Set() };
-
+const audio = { ctx:null, armed:false, bufClick:null, bufUnlock:null, live:new Set() };
 function initAudio(){
   if(!AUDIO_ENABLED || audio.armed) return;
   try{
     audio.ctx = new (window.AudioContext||window.webkitAudioContext)();
     audio.ctx.resume?.();
-    // napravi kratak klik buffer (white-noise blip sa ekspon. envelope)
-    const sr = audio.ctx.sampleRate;
-    const len = Math.max(1, Math.floor(sr*0.04)); // ~40ms
-    const buf = audio.ctx.createBuffer(1, len, sr);
-    const data = buf.getChannelData(0);
-    for(let i=0;i<len;i++){
-      const n = (Math.random()*2-1)*0.2; // blaga jačina
-      // eksponencijalni decay
-      const env = Math.exp(-6*i/len);
-      data[i] = n*env;
-    }
-    audio.buf = buf;
+    const mkBuf=(ms, amp, curve=6)=>{
+      const sr = audio.ctx.sampleRate;
+      const len = Math.max(1, Math.floor(sr*(ms/1000)));
+      const buf = audio.ctx.createBuffer(1, len, sr);
+      const data = buf.getChannelData(0);
+      for(let i=0;i<len;i++){
+        const n = (Math.random()*2-1)*amp;
+        const env = Math.exp(-curve*i/len);
+        data[i] = n*env;
+      }
+      return buf;
+    };
+    audio.bufClick  = mkBuf(40, 0.18, 6);   // kratak, tih
+    audio.bufUnlock = mkBuf(140,0.16, 5);   // malo duži i bogatiji
     audio.armed = true;
   }catch(e){ audio.armed=false; }
 }
 document.addEventListener('pointerdown', initAudio, {once:true});
-
-function playClick(){
-  if(!AUDIO_ENABLED || !audio.armed || !audio.ctx || !audio.buf) return;
+function playBuf(buf){
+  if(!AUDIO_ENABLED || !audio.armed || !audio.ctx || !buf) return;
   try{
-    const src = audio.ctx.createBufferSource();
-    const gain = audio.ctx.createGain();
-    gain.gain.value = 0.6; // i dalje tiho
-    src.buffer = audio.buf;
-    src.connect(gain); gain.connect(audio.ctx.destination);
-    const now = audio.ctx.currentTime;
-    src.start(now);
-    src.stop(now + 0.05);
-    // cleanup
-    src.onended = ()=> { try{src.disconnect(); gain.disconnect();}catch{} audio.live.delete(src); };
+    const src=audio.ctx.createBufferSource(), g=audio.ctx.createGain();
+    g.gain.value=0.7;
+    src.buffer=buf; src.connect(g); g.connect(audio.ctx.destination);
+    const now=audio.ctx.currentTime;
+    src.start(now); src.stop(now + (buf.duration||0.2) + 0.01);
+    src.onended=()=>{ try{src.disconnect(); g.disconnect();}catch{} audio.live.delete(src); };
     audio.live.add(src);
-    // watchdog (ako onended ne naiđe)
-    setTimeout(()=>{ if(audio.live.has(src)){ try{src.stop(); src.disconnect(); gain.disconnect();}catch{} audio.live.delete(src);} }, 120);
+    setTimeout(()=>{ if(audio.live.has(src)){ try{src.stop(); src.disconnect(); g.disconnect();}catch{} audio.live.delete(src); } }, Math.ceil((buf.duration||0.2)*1000)+100);
   }catch{}
 }
-function killAudio(){
-  try{
-    audio.live.forEach(n=>{ try{n.stop(0); n.disconnect();}catch{} });
-    audio.live.clear();
-    audio.ctx && audio.ctx.suspend && audio.ctx.suspend();
-  }catch{}
+const sClick = ()=>playBuf(audio.bufClick);
+const sUnlock= ()=>playBuf(audio.bufUnlock);
+
+/*** KONFETE — lagani CSS/JS, bez biblioteka ***/
+function confetti(ms=1200, count=60){
+  const root = document.getElementById('fx');
+  if(!root) return;
+  const colors = ['#6ee7b7','#93c5fd','#fde68a','#fca5a5','#c4b5fd','#fcd34d'];
+  for(let i=0;i<count;i++){
+    const p=document.createElement('div');
+    p.className='p';
+    p.style.left = Math.round(Math.random()*100)+'vw';
+    p.style.background = colors[i%colors.length];
+    p.style.animation = `fall ${0.8 + Math.random()*1.2}s linear forwards`;
+    p.style.transform = `translateY(-10vh) rotate(${Math.random()*360}deg)`;
+    p.style.opacity = 0.9 + Math.random()*0.1;
+    root.appendChild(p);
+    setTimeout(()=>{ if(p.parentNode) p.parentNode.removeChild(p); }, ms);
+  }
 }
-window.addEventListener('blur', killAudio);
-document.addEventListener('visibilitychange', ()=>{ if(document.hidden) killAudio(); });
 
 /*** RENDER (tajmeri bez rekurzije) ***/
 const activeIntervals = new Set();
@@ -236,7 +269,7 @@ function render(listRaw){
   const list=normalizeRange(listRaw);
   const g=$('#grid'); g.innerHTML='';
 
-  // Uvod
+  // UVOD
   g.appendChild(tileUvod(list.find(x=>x.day===0)));
 
   // tajmer samo za PRVI zaključani free dan
@@ -251,8 +284,10 @@ function tileUvod(intro){
   const el=document.createElement('div'); el.className='tile';
   el.innerHTML=`
     <div class="tday">Uvod</div>
-    <div style="margin-top:8px"><button class="btn">Otvori</button></div>`;
-  el.querySelector('.btn').onclick=()=>{ playClick(); openLesson(0,intro); };
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn">Otvori</button>
+    </div>`;
+  el.querySelector('.btn').onclick=()=>{ sClick(); openLesson(0,intro); };
   return el;
 }
 function tileDan(it, all, nextLocked){
@@ -261,6 +296,9 @@ function tileDan(it, all, nextLocked){
   const isPrem = it.paidTier==='premium';
   const el=document.createElement('div'); el.className='tile';
   const badges=[]; badges.push(`<div class="status ${open?'okb':'lockb'}">${open?'OTKLJUČANO':'ZAKLJUČANO'}</div>`); if(isPrem) badges.push(`<div class="status premium">PREMIUM</div>`);
+  // info “Pročitaj” na danu 8
+  const infoBtn = (d===8) ? `<button class="btn" data-info8="1">Pročitaj</button>` : '';
+
   el.innerHTML=`
     <div style="display:flex;gap:8px;flex-wrap:wrap">${badges.join('')}</div>
     <div class="tday">Dan ${d}</div>
@@ -271,23 +309,27 @@ function tileDan(it, all, nextLocked){
     </div>
     <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" ${open?'':'disabled'}>Otvori vežbu</button>
+      ${infoBtn}
       ${(!open && isPrem && !hasPremium()) ? `<button class="btn gold buy">Otključaj Premium</button><button class="btn" id="tok_${d}">Imam token</button>`:''}
     </div>`;
   if(open){
-    el.querySelector('.btn').onclick=()=>{ playClick(); openLesson(d,it); };
+    el.querySelector('.btn').onclick=()=>{ sClick(); openLesson(d,it); if(d===1){ sUnlock(); confetti(1400,70);} };
   }else{
     const cd=el.querySelector('.cd');
     if(cd && nextLocked===d){
-      const tick=()=>{ const left=Math.max(0,(unlockAt(d,all)||0)-Date.now()); cd.textContent=timeLeft(left); if(left<=0){ playClick(); queueRefresh(all); } };
+      const tick=()=>{ const left=Math.max(0,(unlockAt(d,all)||0)-Date.now()); cd.textContent=timeLeft(left); if(left<=0){ sUnlock(); confetti(1200,60); queueRefresh(all); } };
       tick();
       const iv=setInterval(()=>{ if(!document.body.contains(cd)) return clearInterval(iv); tick(); },1000);
       activeIntervals.add(iv);
     }
     const buy=el.querySelector('.buy');
-    if(buy){ buy.onclick=()=>{ playClick(); window.open(PAYMENT_URL,'_blank'); }; }
+    if(buy){ buy.onclick=()=>{ sClick(); window.open(PAYMENT_URL,'_blank'); }; }
     const tokBtn=el.querySelector(`#tok_${d}`);
-    if(tokBtn){ tokBtn.onclick=()=>{ playClick(); openTokenModal(); } }
+    if(tokBtn){ tokBtn.onclick=()=>{ sClick(); openTokenModal(); } }
   }
+  const info8 = el.querySelector('[data-info8]');
+  if(info8){ info8.onclick=()=>{ sClick(); openInfo8(); } }
+
   return el;
 }
 
@@ -304,7 +346,7 @@ function openLesson(day, it){
 }
 function show(v){ document.getElementById('ov').style.display=v?'block':'none'; const m=document.getElementById('md'); if(v){ m.classList.add('show'); m.style.display='flex'; }else{ m.classList.remove('show'); setTimeout(()=>m.style.display='none',160);} }
 document.getElementById('close').onclick=()=>show(false);
-document.getElementById('done').onchange=e=>{ markDone(currentDay,e.target.checked); playClick(); } ;
+document.getElementById('done').onchange=e=>{ markDone(currentDay,e.target.checked); sClick(); } ;
 document.getElementById('nt').oninput=e=>localStorage.setItem(LS+'_notes_'+currentDay,e.target.value||'');
 
 /*** TOKEN MODAL ***/
@@ -327,6 +369,11 @@ $('#tokenBtn').onclick=async ()=>{
   }catch(e){ $('#tokMsg').textContent='Greška mreže.'; }
 };
 function toast(msg){ const el=$('#t'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1800); }
+
+/*** INFO DAN 8 ***/
+function show3(v){ document.getElementById('ov3').style.display=v?'block':'none'; const m=document.getElementById('md3'); if(v){ m.classList.add('show'); m.style.display='flex'; }else{ m.classList.remove('show'); setTimeout(()=>m.style.display='none',160);} }
+function openInfo8(){ show3(true); }
+document.getElementById('close3').onclick=()=>show3(false);
 
 /*** INIT ***/
 let currentItems=FALLBACK;
