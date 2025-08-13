@@ -36,15 +36,13 @@
   .notes{margin-top:10px}
   .notes textarea{width:100%;min-height:90px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.18);color:#fff;padding:10px;font-size:16px}
   .actions{margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .err{position:fixed;left:0;right:0;top:0;z-index:9999;background:#3a1515;color:#ffd4d4;border-bottom:1px solid #6a2c2c;padding:10px 12px;font-size:13px;display:none}
+  @media (max-width:540px){ .content{font-size:16.5px} .tday{font-size:16px} .ttitle{font-size:14.5px} }
 </style>
 </head>
 <body>
 <header>
   <h1>Matrixx 30 dana izazov</h1>
 </header>
-
-<div id="err" class="err"></div>
 
 <main>
   <div id="grid" class="grid"></div>
@@ -68,9 +66,9 @@
 </div>
 
 <script>
-/*** 0) SIGURAN PayPal link — bez menjanja koda
-     (možeš ga poslati kroz ?pay= u URL-u) ***/
-const PAYMENT_URL = new URLSearchParams(location.search).get('pay') || 'https://paypal.me/tvojusername/20';
+/*** 0) PayPal link kroz ?pay= ***/
+const PAYMENT_URL = new URLSearchParams(location.search).get('pay') || 'https://www.paypal.com/paypalme/nenadvip/20usd';
+;
 
 /*** 1) TVOJ GAS URL ***/
 const API = 'https://script.google.com/macros/s/AKfycbw2AtMAeXudx-dIfF8nrGYn62KVa3rPhSB3HuFMGthF7hq97o3nabWG85fsGixWSHS2/exec';
@@ -88,7 +86,7 @@ const FALLBACK = [
 ];
 
 /*** 3) STATE ***/
-const LS='mx7_state_v5';
+const LS='mx7_state_v6';
 const qs=new URLSearchParams(location.search);
 if(qs.get('reset')==='1'){ try{ localStorage.removeItem(LS); localStorage.removeItem('mx7_content_cache'); }catch{} }
 if(qs.get('pro')==='1'){ const s=S(); s.premium=true; W(s); }
@@ -135,7 +133,19 @@ async function loadItems(){
 let ac; function tone(f=660,d=0.09,g=0.04){ try{ ac=ac||new (window.AudioContext||window.webkitAudioContext)(); const o=ac.createOscillator(), v=ac.createGain(); o.type='sine'; o.frequency.value=f; v.gain.value=g; v.connect(ac.destination); o.connect(v); o.start(); v.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+d); o.stop(ac.currentTime+d);}catch{} }
 function clickS(){ tone(660,0.08,0.05) } function unlockS(){ tone(440,0.12,0.06); setTimeout(()=>tone(880,0.12,0.05),90) }
 
-/*** 6) RENDER ***/
+/*** 6) RENDER — sa kontrolom tajmera i bez direktnog rekurzivnog rendera ***/
+const activeIntervals = new Set();
+let rafRefreshQueued = false;
+function queueRefresh(items){
+  if(rafRefreshQueued) return;
+  rafRefreshQueued = true;
+  requestAnimationFrame(()=>{ rafRefreshQueued=false; render(items); });
+}
+function clearIntervals(){
+  activeIntervals.forEach(id=>clearInterval(id));
+  activeIntervals.clear();
+}
+
 function normalizeRange(listRaw){
   const max = Math.max(7, ...listRaw.map(x=>x.day||0));
   const by=new Map(listRaw.map(x=>[Number(x.day)||0,x]));
@@ -158,13 +168,17 @@ function canOpen(it, list){
 }
 
 function render(listRaw){
+  // 1) bez gomilanja tajmera
+  clearIntervals();
+
   const list=normalizeRange(listRaw);
   const g=$('#grid'); g.innerHTML='';
 
-  // Uvod minimalno
+  // Uvod
   g.appendChild(tileUvod(list.find(x=>x.day===0)));
 
-  const nextD = nextLockedDay(list); // tajmer samo za prvi zaključani free dan
+  // Tajmer samo za naredni zaključani FREE dan
+  const nextD = nextLockedDay(list);
 
   list.filter(x=>x.day>=1).forEach(it=>{
     g.appendChild(tileDan(it,list,nextD));
@@ -204,8 +218,14 @@ function tileDan(it, all, nextLocked){
   }else{
     const cd=el.querySelector('.cd');
     if(cd && nextLocked===d){
-      const tick=()=>{ const left=Math.max(0,(unlockAt(d,all)||0)-Date.now()); cd.textContent=timeLeft(left); if(left<=0){ unlockS(); render(all); } };
-      tick(); const iv=setInterval(()=>{ if(!document.body.contains(cd)) return clearInterval(iv); tick(); },1000);
+      const tick=()=>{ 
+        const left=Math.max(0,(unlockAt(d,all)||0)-Date.now()); 
+        cd.textContent=timeLeft(left); 
+        if(left<=0){ unlockS(); queueRefresh(all); }
+      };
+      tick(); 
+      const iv=setInterval(()=>{ if(!document.body.contains(cd)) return clearInterval(iv); tick(); },1000);
+      activeIntervals.add(iv);
     }
     const buy=el.querySelector('.buy');
     if(buy){ buy.onclick=()=>{ clickS(); window.open(PAYMENT_URL,'_blank'); }; }
@@ -216,7 +236,7 @@ function tileDan(it, all, nextLocked){
 /*** 7) MODAL ***/
 let currentDay=null;
 function openLesson(day, it){
-  if(day===1 && !S().startedAt){ ensureStarted(Number(it.lockedAfterHours)||12); setTimeout(()=>render(currentItems),0); }
+  if(day===1 && !S().startedAt){ ensureStarted(Number(it.lockedAfterHours)||12); queueRefresh(currentItems); }
   currentDay=day;
   document.getElementById('ttl').textContent = day===0 ? 'Uvod' : (it.title||('Dan '+day));
   document.getElementById('body').textContent = it.body||'Nema teksta.';
@@ -229,17 +249,18 @@ document.getElementById('close').onclick=()=>show(false);
 document.getElementById('done').onchange=e=>{ markDone(currentDay,e.target.checked); clickS(); } ;
 document.getElementById('nt').oninput=e=>localStorage.setItem(LS+'_notes_'+currentDay,e.target.value||'');
 
-/*** 8) INIT + DIJAGNOSTIKA ***/
-function showError(msg){ const b=document.getElementById('err'); b.textContent='Greška: '+msg; b.style.display='block'; }
-window.addEventListener('error',e=>{ showError(e.message||'Nepoznata greška'); });
-
+/*** 8) INIT ***/
 let currentItems=FALLBACK;
 (async function(){
   try{
     const items=await loadItems();
     currentItems=items;
     render(items);
-  }catch(e){ showError(e.message||String(e)); }
+  }catch(e){
+    // Ako baš nešto pukne, prikaži makar fallback
+    currentItems=FALLBACK;
+    render(FALLBACK);
+  }
 })();
 </script>
 </body>
