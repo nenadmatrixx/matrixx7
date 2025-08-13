@@ -35,7 +35,6 @@
   .notes{margin-top:10px}
   .notes textarea{width:100%;min-height:90px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.18);color:#fff;padding:10px;font-size:16px}
   .actions{margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  /* mini modal za token */
   .mini{width:min(420px,92vw)}
   .field{display:flex;gap:8px}
   .field input{flex:1 1 auto;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.2);color:#fff;padding:10px 12px;font-size:16px}
@@ -88,9 +87,9 @@
 <div id="t" class="toast">Premium aktiviran ✅</div>
 
 <script>
-/*** 0) PayPal ***/
+/*** 0) PayPal (možeš menjati i preko &pay= u URL-u) ***/
 const PAYMENT_URL = new URLSearchParams(location.search).get('pay')
-  || 'https://www.paypal.com/paypalme/nenadvip/19usd';
+  || 'https://www.paypal.com/paypalme/nenadvip/20usd';
 
 /*** 1) GAS URL ***/
 const API = 'https://script.google.com/macros/s/AKfycbw2AtMAeXudx-dIfF8nrGYn62KVa3rPhSB3HuFMGthF7hq97o3nabWG85fsGixWSHS2/exec';
@@ -108,7 +107,7 @@ const FALLBACK = [
 ];
 
 /*** 3) STATE ***/
-const LS='mx7_state_v7';
+const LS='mx7_state_v8';
 const qs=new URLSearchParams(location.search);
 if(qs.get('reset')==='1'){ try{ localStorage.removeItem(LS); localStorage.removeItem('mx7_content_cache'); }catch{} }
 if(qs.get('pro')==='1'){ const s=S(); s.premium=true; W(s); }
@@ -151,26 +150,37 @@ async function loadItems(){
   }
 }
 
-/*** 5) SOUND — nežan klik (0.04s, tiho) ***/
-let ac;
-function softClick(){ try{
-  ac=ac||new (window.AudioContext||window.webkitAudioContext)();
-  const o=ac.createOscillator(), g=ac.createGain();
-  o.type='triangle'; o.frequency.value=280; g.gain.value=0.03;
-  o.connect(g); g.connect(ac.destination);
-  o.start();
-  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+0.04);
-  o.stop(ac.currentTime+0.045);
-}catch{}}
-function unlockJingle(){ try{
-  ac=ac||new (window.AudioContext||window.webkitAudioContext)();
-  const o=ac.createOscillator(), g=ac.createGain();
-  o.type='sine'; o.frequency.value=520; g.gain.value=0.025;
-  o.connect(g); g.connect(ac.destination);
-  o.start();
-  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+0.12);
-  o.stop(ac.currentTime+0.13);
-}catch{}}
+/*** 5) AUDIO — bez autoplay, bez “zaglavljivanja” ***/
+const AUDIO_ENABLED = !(/(?:snd=0|nosnd=1)/.test(location.search));
+const audio = { ctx:null, armed:false };
+function initAudio(){ if(!AUDIO_ENABLED || audio.armed) return;
+  try{
+    audio.ctx = new (window.AudioContext||window.webkitAudioContext)();
+    audio.ctx.resume?.();
+    audio.armed = true;
+  }catch(e){ audio.armed=false; }
+}
+document.addEventListener('pointerdown', initAudio, {once:true});
+function playBeep(freq=300, dur=0.05, vol=0.02){
+  if(!AUDIO_ENABLED || !audio.armed || !audio.ctx) return;
+  try{
+    const ctx=audio.ctx;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type='sine'; osc.frequency.value=freq;
+    gain.gain.value=vol;
+    osc.connect(gain); gain.connect(ctx.destination);
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(vol, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now+dur);
+    osc.start(now);
+    osc.stop(now+dur+0.005);
+    // watch-dog cleanup
+    setTimeout(()=>{ try{osc.disconnect(); gain.disconnect();}catch{} }, (dur*1000)+40);
+  }catch{}
+}
+const softClick = ()=>playBeep(280,0.04,0.018);
+const unlockJingle = ()=>playBeep(520,0.12,0.022);
 
 /*** 6) RENDER (sa kontrolom tajmera) ***/
 const activeIntervals = new Set();
@@ -204,7 +214,6 @@ function render(listRaw){
   const list=normalizeRange(listRaw);
   const g=$('#grid'); g.innerHTML='';
 
-  // Uvod (nema dodatnih natpisa)
   g.appendChild(tileUvod(list.find(x=>x.day===0)));
 
   const nextD = nextLockedDay(list);
@@ -258,7 +267,7 @@ function tileDan(it, all, nextLocked){
   return el;
 }
 
-/*** 7) MODAL VEŽBE ***/
+/*** MODAL VEŽBE ***/
 let currentDay=null;
 function openLesson(day, it){
   if(day===1 && !S().startedAt){ ensureStarted(Number(it.lockedAfterHours)||12); queueRefresh(currentItems); }
@@ -274,7 +283,7 @@ document.getElementById('close').onclick=()=>show(false);
 document.getElementById('done').onchange=e=>{ markDone(currentDay,e.target.checked); softClick(); } ;
 document.getElementById('nt').oninput=e=>localStorage.setItem(LS+'_notes_'+currentDay,e.target.value||'');
 
-/*** 8) TOKEN MODAL ***/
+/*** TOKEN MODAL ***/
 function show2(v){ document.getElementById('ov2').style.display=v?'block':'none'; const m=document.getElementById('md2'); if(v){ m.classList.add('show'); m.style.display='flex'; }else{ m.classList.remove('show'); setTimeout(()=>m.style.display='none',160);} }
 function openTokenModal(){ $('#tokenInput').value=''; $('#tokMsg').textContent=''; show2(true); }
 $('#close2').onclick=()=>show2(false);
@@ -295,7 +304,7 @@ $('#tokenBtn').onclick=async ()=>{
 };
 function toast(msg){ const el=$('#t'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1800); }
 
-/*** 9) INIT ***/
+/*** INIT ***/
 let currentItems=FALLBACK;
 (async function(){
   try{
