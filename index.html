@@ -87,14 +87,14 @@
 <div id="t" class="toast">Premium aktiviran ✅</div>
 
 <script>
-/*** 0) PayPal (možeš menjati i preko &pay= u URL-u) ***/
+/*** PayPal (možeš menjati i preko &pay= u URL-u) ***/
 const PAYMENT_URL = new URLSearchParams(location.search).get('pay')
   || 'https://www.paypal.com/paypalme/nenadvip/20usd';
 
-/*** 1) GAS URL ***/
+/*** GAS URL ***/
 const API = 'https://script.google.com/macros/s/AKfycbw2AtMAeXudx-dIfF8nrGYn62KVa3rPhSB3HuFMGthF7hq97o3nabWG85fsGixWSHS2/exec';
 
-/*** 2) FALLBACK ***/
+/*** FALLBACK ***/
 const FALLBACK = [
   {day:0,title:'Uvod',body:'7-DNEVNI MATRIXX IZAZOV — Reprogramiranje identiteta za 10 minuta dnevno.\nMatrixx podiže nivo svesti; viši nivo = bolje odluke, emocije, odnosi.\nMetafora nebodera: što si više, šira slika. Cilj: iz mehaničnog u svesno, sprat po sprat.',lockedAfterHours:0,paidTier:'free'},
   {day:1,title:'Dan 1',body:'Nikada ne prekrštajte noge dok sedite (kod kuće, na poslu, u javnosti).\nZašto: prekrštanje je nesvesni obrazac koji vraća stari identitet. Promena počinje razbijanjem posturalnih petlji. 7 dana: sedite drugačije.',lockedAfterHours:12,paidTier:'free'},
@@ -106,8 +106,8 @@ const FALLBACK = [
   {day:7,title:'Dan 7',body:'Pojedite ceo obrok u tišini: bez telefona i razgovora.\nPosmatrajte pokrete, ukus, senzacije i reakcije uma.',lockedAfterHours:12,paidTier:'free'},
 ];
 
-/*** 3) STATE ***/
-const LS='mx7_state_v8';
+/*** STATE ***/
+const LS='mx7_state_v9';
 const qs=new URLSearchParams(location.search);
 if(qs.get('reset')==='1'){ try{ localStorage.removeItem(LS); localStorage.removeItem('mx7_content_cache'); }catch{} }
 if(qs.get('pro')==='1'){ const s=S(); s.premium=true; W(s); }
@@ -126,7 +126,7 @@ function unlockAt(day, items){
 function isUnlockedByTime(day, items){ if(day===1) return true; const t=unlockAt(day,items); return t && Date.now()>=t; }
 function timeLeft(ms){ if(ms<=0)return'00:00:00'; const s=Math.floor(ms/1000); const h=String(Math.floor(s/3600)).padStart(2,'0'); const m=String(Math.floor((s%3600)/60)).padStart(2,'0'); const ss=String(s%60).padStart(2,'0'); return `${h}:${m}:${ss}`; }
 
-/*** 4) LOAD ***/
+/*** LOAD ***/
 async function loadItems(){
   try{
     const r=await fetch(API+'?route=content',{cache:'no-store'});
@@ -150,39 +150,61 @@ async function loadItems(){
   }
 }
 
-/*** 5) AUDIO — bez autoplay, bez “zaglavljivanja” ***/
+/*** AUDIO — bez oscilatora, siguran one-shot buffer klik ***/
 const AUDIO_ENABLED = !(/(?:snd=0|nosnd=1)/.test(location.search));
-const audio = { ctx:null, armed:false };
-function initAudio(){ if(!AUDIO_ENABLED || audio.armed) return;
+const audio = { ctx:null, armed:false, buf:null, live:new Set() };
+
+function initAudio(){
+  if(!AUDIO_ENABLED || audio.armed) return;
   try{
     audio.ctx = new (window.AudioContext||window.webkitAudioContext)();
     audio.ctx.resume?.();
+    // napravi kratak klik buffer (white-noise blip sa ekspon. envelope)
+    const sr = audio.ctx.sampleRate;
+    const len = Math.max(1, Math.floor(sr*0.04)); // ~40ms
+    const buf = audio.ctx.createBuffer(1, len, sr);
+    const data = buf.getChannelData(0);
+    for(let i=0;i<len;i++){
+      const n = (Math.random()*2-1)*0.2; // blaga jačina
+      // eksponencijalni decay
+      const env = Math.exp(-6*i/len);
+      data[i] = n*env;
+    }
+    audio.buf = buf;
     audio.armed = true;
   }catch(e){ audio.armed=false; }
 }
 document.addEventListener('pointerdown', initAudio, {once:true});
-function playBeep(freq=300, dur=0.05, vol=0.02){
-  if(!AUDIO_ENABLED || !audio.armed || !audio.ctx) return;
+
+function playClick(){
+  if(!AUDIO_ENABLED || !audio.armed || !audio.ctx || !audio.buf) return;
   try{
-    const ctx=audio.ctx;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type='sine'; osc.frequency.value=freq;
-    gain.gain.value=vol;
-    osc.connect(gain); gain.connect(ctx.destination);
-    const now = ctx.currentTime;
-    gain.gain.setValueAtTime(vol, now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now+dur);
-    osc.start(now);
-    osc.stop(now+dur+0.005);
-    // watch-dog cleanup
-    setTimeout(()=>{ try{osc.disconnect(); gain.disconnect();}catch{} }, (dur*1000)+40);
+    const src = audio.ctx.createBufferSource();
+    const gain = audio.ctx.createGain();
+    gain.gain.value = 0.6; // i dalje tiho
+    src.buffer = audio.buf;
+    src.connect(gain); gain.connect(audio.ctx.destination);
+    const now = audio.ctx.currentTime;
+    src.start(now);
+    src.stop(now + 0.05);
+    // cleanup
+    src.onended = ()=> { try{src.disconnect(); gain.disconnect();}catch{} audio.live.delete(src); };
+    audio.live.add(src);
+    // watchdog (ako onended ne naiđe)
+    setTimeout(()=>{ if(audio.live.has(src)){ try{src.stop(); src.disconnect(); gain.disconnect();}catch{} audio.live.delete(src);} }, 120);
   }catch{}
 }
-const softClick = ()=>playBeep(280,0.04,0.018);
-const unlockJingle = ()=>playBeep(520,0.12,0.022);
+function killAudio(){
+  try{
+    audio.live.forEach(n=>{ try{n.stop(0); n.disconnect();}catch{} });
+    audio.live.clear();
+    audio.ctx && audio.ctx.suspend && audio.ctx.suspend();
+  }catch{}
+}
+window.addEventListener('blur', killAudio);
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) killAudio(); });
 
-/*** 6) RENDER (sa kontrolom tajmera) ***/
+/*** RENDER (tajmeri bez rekurzije) ***/
 const activeIntervals = new Set();
 let rafRefreshQueued = false;
 function queueRefresh(items){ if(rafRefreshQueued) return; rafRefreshQueued=true; requestAnimationFrame(()=>{ rafRefreshQueued=false; render(items); }); }
@@ -214,8 +236,10 @@ function render(listRaw){
   const list=normalizeRange(listRaw);
   const g=$('#grid'); g.innerHTML='';
 
+  // Uvod
   g.appendChild(tileUvod(list.find(x=>x.day===0)));
 
+  // tajmer samo za PRVI zaključani free dan
   const nextD = nextLockedDay(list);
 
   list.filter(x=>x.day>=1).forEach(it=>{
@@ -228,7 +252,7 @@ function tileUvod(intro){
   el.innerHTML=`
     <div class="tday">Uvod</div>
     <div style="margin-top:8px"><button class="btn">Otvori</button></div>`;
-  el.querySelector('.btn').onclick=()=>{ softClick(); openLesson(0,intro); };
+  el.querySelector('.btn').onclick=()=>{ playClick(); openLesson(0,intro); };
   return el;
 }
 function tileDan(it, all, nextLocked){
@@ -250,19 +274,19 @@ function tileDan(it, all, nextLocked){
       ${(!open && isPrem && !hasPremium()) ? `<button class="btn gold buy">Otključaj Premium</button><button class="btn" id="tok_${d}">Imam token</button>`:''}
     </div>`;
   if(open){
-    el.querySelector('.btn').onclick=()=>{ softClick(); openLesson(d,it); };
+    el.querySelector('.btn').onclick=()=>{ playClick(); openLesson(d,it); };
   }else{
     const cd=el.querySelector('.cd');
     if(cd && nextLocked===d){
-      const tick=()=>{ const left=Math.max(0,(unlockAt(d,all)||0)-Date.now()); cd.textContent=timeLeft(left); if(left<=0){ unlockJingle(); queueRefresh(all); } };
+      const tick=()=>{ const left=Math.max(0,(unlockAt(d,all)||0)-Date.now()); cd.textContent=timeLeft(left); if(left<=0){ playClick(); queueRefresh(all); } };
       tick();
       const iv=setInterval(()=>{ if(!document.body.contains(cd)) return clearInterval(iv); tick(); },1000);
       activeIntervals.add(iv);
     }
     const buy=el.querySelector('.buy');
-    if(buy){ buy.onclick=()=>{ softClick(); window.open(PAYMENT_URL,'_blank'); }; }
+    if(buy){ buy.onclick=()=>{ playClick(); window.open(PAYMENT_URL,'_blank'); }; }
     const tokBtn=el.querySelector(`#tok_${d}`);
-    if(tokBtn){ tokBtn.onclick=()=>{ softClick(); openTokenModal(); } }
+    if(tokBtn){ tokBtn.onclick=()=>{ playClick(); openTokenModal(); } }
   }
   return el;
 }
@@ -274,13 +298,13 @@ function openLesson(day, it){
   currentDay=day;
   document.getElementById('ttl').textContent = day===0 ? 'Uvod' : `Vežba — Dan ${day}`;
   document.getElementById('body').textContent = it.body||'Nema teksta.';
-  document.getElementById('nt').value = localStorage.getItem(LS+'_notes_'+day)||'';
-  document.getElementById('done').checked = isDone(day);
+  document.getElementById('nt').value = localStorage.getItem(LS+'_notes_'+currentDay)||'';
+  document.getElementById('done').checked = isDone(currentDay);
   show(true);
 }
 function show(v){ document.getElementById('ov').style.display=v?'block':'none'; const m=document.getElementById('md'); if(v){ m.classList.add('show'); m.style.display='flex'; }else{ m.classList.remove('show'); setTimeout(()=>m.style.display='none',160);} }
 document.getElementById('close').onclick=()=>show(false);
-document.getElementById('done').onchange=e=>{ markDone(currentDay,e.target.checked); softClick(); } ;
+document.getElementById('done').onchange=e=>{ markDone(currentDay,e.target.checked); playClick(); } ;
 document.getElementById('nt').oninput=e=>localStorage.setItem(LS+'_notes_'+currentDay,e.target.value||'');
 
 /*** TOKEN MODAL ***/
