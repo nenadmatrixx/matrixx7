@@ -3,16 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Matrixx 7</title>
+<title>Matrixx 7/30</title>
 <meta name="theme-color" content="#0f1722">
 <style>
-  :root{--bg:#0b1220;--panel:#0f1b2c;--line:#24364e;--text:#eaf2ff;--muted:#9fb0c9;--green:#2fa36a;--green-bg:#0e3725;--red:#d75555;--red-bg:#3a1515}
+  :root{--bg:#0b1220;--panel:#0f1b2c;--line:#24364e;--text:#eaf2ff;--muted:#9fb0c9;--green:#2fa36a;--green-bg:#0e3725;--red:#d75555;--red-bg:#3a1515;--gold:#f6c453}
   *{box-sizing:border-box}
   html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b1220,#0f1729);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
   header{padding:14px 16px;background:#0e1a2b;border-bottom:1px solid var(--line)}
   h1{margin:0;font-size:22px;font-weight:800}
   .sub{color:var(--muted);font-size:14px}
   main{padding:12px;display:grid;gap:12px}
+  .row{display:grid;gap:12px;grid-template-columns:1fr;align-items:start}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
   h2{margin:0 0 8px;font-size:14px;letter-spacing:.2px;text-transform:uppercase;color:#d7e6fb}
   .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
@@ -21,11 +22,13 @@
   .status{display:inline-block;padding:5px 10px;border-radius:999px;border:1px solid #2a3b4e;font-size:13px}
   .okb{background:var(--green-bg);color:#baf4ce;border-color:#2c6a45}
   .lockb{background:var(--red-bg);color:#ffc7c7;border-color:#6a2c2c}
+  .premium{display:inline-flex;align-items:center;gap:6px;border-color:#7a5b1b;background:rgba(246,196,83,.12);color:#ffd88a}
   .tday{font-size:18px;font-weight:800;margin:8px 0 4px}
   .ttitle{font-size:15px}
   .info{font-size:13px;color:#cfe0f4;margin-top:6px}
   .btn{display:inline-block;background:#0c141c;border:1px solid #2a3b4e;color:#fff;border-radius:10px;padding:10px 12px;cursor:pointer}
   .btn[disabled]{opacity:.5;cursor:not-allowed}
+  .btn.gold{border-color:#7a5b1b;background:rgba(246,196,83,.1)}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:90}
   .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.98);
     width:min(560px,94vw);max-height:90vh;background:#133156;border:1px solid #29466d;border-radius:14px;padding:12px;display:none;z-index:100;opacity:0;transition:opacity .2s,transform .2s}
@@ -43,19 +46,28 @@
 </head>
 <body>
 <header>
-  <h1>Matrixx 7</h1>
+  <h1>Matrixx 7/30</h1>
   <div class="sub">Dan 1 je odmah otključan · Ostali dani se otključavaju prema satima iz sadržaja.</div>
 </header>
 
 <main>
-  <div class="card">
-    <h2>Status</h2>
-    <div id="status" class="muted">Učitavam…</div>
-  </div>
-
-  <div class="card">
-    <h2>Putanja</h2>
-    <div id="grid" class="grid"></div>
+  <div class="row">
+    <div class="card">
+      <h2>Status</h2>
+      <div id="status" class="muted">Učitavam…</div>
+    </div>
+    <div class="card">
+      <h2>Premium</h2>
+      <div class="muted" id="premState">Nije aktivan</div>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn gold" id="buyBtn">Otključaj Premium</button>
+        <button class="btn" id="proToggle">Ručno aktiviraj/deaktiviraj (test)</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Putanja</h2>
+      <div id="grid" class="grid"></div>
+    </div>
   </div>
 </main>
 
@@ -77,10 +89,13 @@
 </div>
 
 <script>
-/*** 1) TVOJ GAS URL ***/
+/*** 0) KONFIG ***/
+// 1) Tvoj GAS URL:
 const API = 'https://script.google.com/macros/s/AKfycbw2AtMAeXudx-dIfF8nrGYn62KVa3rPhSB3HuFMGthF7hq97o3nabWG85fsGixWSHS2/exec';
+// 2) Link za plaćanje (promeni!):
+const PAYMENT_URL = 'https://paypal.me/tvojusername/20'; // <-- promeni ovo
 
-/*** 2) FALLBACK — radi i bez GAS-a ***/
+/*** 1) FALLBACK — radi i bez GAS-a ***/
 const FALLBACK = [
   {day:0,title:'Uvod',body:'7-DNEVNI MATRIXX IZAZOV — Reprogramiranje identiteta za 10 minuta dnevno.\nMatrixx podiže nivo svesti; viši nivo = bolje odluke, emocije, odnosi.\nMetafora nebodera: što si više, šira slika. Cilj: iz mehaničnog u svesno, sprat po sprat.',lockedAfterHours:0,paidTier:'free'},
   {day:1,title:'Dan 1 — Zaključavanje nogu',body:'Nikada ne prekrštajte noge dok sedite (kod kuće, na poslu, u javnosti).\nZašto: prekrštanje je nesvesni obrazac koji vraća stari identitet. Promena počinje razbijanjem posturalnih petlji. 7 dana: sedite drugačije.',lockedAfterHours:12,paidTier:'free'},
@@ -92,25 +107,30 @@ const FALLBACK = [
   {day:7,title:'Dan 7 — Svesno jedenje',body:'Pojedite ceo obrok u tišini: bez telefona i razgovora.\nPosmatrajte pokrete, ukus, senzacije i reakcije uma.',lockedAfterHours:12,paidTier:'free'},
 ];
 
-/*** 3) STATE + RESET ***/
-const LS='mx7_state_safe_v2';
+/*** 2) STATE + RESET + PREMIUM ***/
+const LS='mx7_state_v3';
 const qs=new URLSearchParams(location.search);
 if(qs.get('reset')==='1'){ try{ localStorage.removeItem(LS); localStorage.removeItem('mx7_content_cache'); }catch{} }
+if(qs.get('pro')==='1'){ const s=S(); s.premium=true; W(s); } // aktivacija preko ?pro=1
+
 const $=q=>document.querySelector(q);
 function S(){ try{return JSON.parse(localStorage.getItem(LS)||'{}')}catch{return{}} }
 function W(v){ localStorage.setItem(LS, JSON.stringify(v)); }
 function ensureStarted(h){ const s=S(); if(!s.startedAt){ s.startedAt=Date.now(); s.h=h||12; s.done={}; W(s);} }
 function isDone(d){ const s=S(); return !!(s.done&&s.done[d]); }
 function markDone(d,v){ const s=S(); if(!s.done)s.done={}; s.done[d]=!!v; W(s); }
+function hasPremium(){ const s=S(); return !!s.premium; }
+function setPremium(v){ const s=S(); s.premium=!!v; W(s); updatePremState(); }
+
 function unlockAt(day, items){
   const s=S(); if(!s.startedAt) return null; let acc=0;
   for(let d=2; d<=day; d++){ const prev=items.find(x=>x.day===d-1); const h=(prev && Number(prev.lockedAfterHours))||12; acc+=h; }
   return s.startedAt + acc*3600*1000;
 }
-function isUnlocked(day, items){ if(day===1) return true; const t=unlockAt(day,items); return t && Date.now()>=t; }
+function isUnlockedByTime(day, items){ if(day===1) return true; const t=unlockAt(day,items); return t && Date.now()>=t; }
 function timeLeft(ms){ if(ms<=0)return'00:00:00'; const s=Math.floor(ms/1000); const h=String(Math.floor(s/3600)).padStart(2,'0'); const m=String(Math.floor((s%3600)/60)).padStart(2,'0'); const ss=String(s%60).padStart(2,'0'); return `${h}:${m}:${ss}`; }
 
-/*** 4) LOAD: GAS → cache → fallback (nikad prazan) ***/
+/*** 3) LOAD: GAS → cache → fallback ***/
 async function loadItems(){
   const st=$('#status');
   try{
@@ -123,7 +143,7 @@ async function loadItems(){
         body: String(it.body||''),
         lockedAfterHours: Number(it.lockedAfterHours)||12,
         paidTier: String(it.paidTier||'free').toLowerCase()
-      }));
+      })).sort((a,b)=>a.day-b.day);
       localStorage.setItem('mx7_content_cache', JSON.stringify(norm));
       st.textContent='OK – '+norm.length+' stavki iz Sheet-a';
       return norm;
@@ -131,44 +151,67 @@ async function loadItems(){
     throw new Error('empty');
   }catch(e){
     const cache=localStorage.getItem('mx7_content_cache');
-    if(cache){ const items=JSON.parse(cache); st.textContent='OK (cache) – '+items.length+' stavki'; return items; }
-    st.textContent='Fallback – offline set (GAS nedostupan)';
+    if(cache){ const items=JSON.parse(cache); $('#status').textContent='OK (cache) – '+items.length+' stavki'; return items; }
+    $('#status').textContent='Fallback – offline set (GAS nedostupan)';
     return FALLBACK;
   }
 }
 
-/*** 5) ROBUSNO CRTANJE — uvek UVOD + 1..7 ***/
-function safeByDay(list){
-  const by=new Map(list.map(x=>[Number(x.day)||0,x]));
+/*** 4) AUDIO — blagi klik / unlock ***/
+let ac;
+function tone(freq=660,dur=0.09,g=0.04){ try{
+  ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+  const o=ac.createOscillator(), v=ac.createGain();
+  o.type='sine'; o.frequency.value=freq;
+  v.gain.value=g; v.connect(ac.destination);
+  o.connect(v); o.start(); v.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+dur); o.stop(ac.currentTime+dur);
+}catch{}}
+function clickS(){ tone(660,0.08,0.05) }
+function unlockS(){ tone(440,0.12,0.06); setTimeout(()=>tone(880,0.12,0.05),90) }
+
+/*** 5) RENDER ***/
+function normalizeRange(listRaw){
+  // Uvek imamo 0..maxDay koji postoji u podacima ili bar 7
+  const max = Math.max(7, ...listRaw.map(x=>x.day||0));
+  const by=new Map(listRaw.map(x=>[Number(x.day)||0,x]));
   const out=[];
-  for(let d=0; d<=7; d++){
+  for(let d=0; d<=max; d++){
     if(by.has(d)) out.push(by.get(d));
     else if(d===0) out.push({day:0,title:'Uvod',body:'',lockedAfterHours:0,paidTier:'free'});
-    else out.push({day:d,title:`Dan ${d}`,body:'(nema teksta u Sheet-u)',lockedAfterHours:12,paidTier:'free'});
+    else out.push({day:d,title:`Dan ${d}`,body:'(nema teksta u Sheet-u)',lockedAfterHours:12,paidTier: d<=7?'free':'premium'});
   }
-  return out;
+  return out.sort((a,b)=>a.day-b.day);
+}
+
+function nextLockedDay(list){
+  // Prvi dan >=2 koji NIJE otključan vremenom (bez premium logike)
+  for(const it of list){
+    if(it.day>=2 && !isUnlockedByTime(it.day,list)) return it.day;
+  }
+  return null;
+}
+
+function canOpen(it, list){
+  // premium pravilo + vreme
+  if(it.day===0) return true;
+  if(it.day===1) return true;
+  if(it.paidTier==='premium' && !hasPremium()) return false;
+  return isUnlockedByTime(it.day, list);
 }
 
 function render(listRaw){
-  const list=safeByDay(listRaw);
+  const list=normalizeRange(listRaw);
   const g=$('#grid'); g.innerHTML='';
 
   // Uvod
-  g.appendChild(tileUvod(list[0]));
+  g.appendChild(tileUvod(list.find(x=>x.day===0)));
 
-  // Dan 1..7
-  for(let d=1; d<=7; d++){
-    try{ g.appendChild(tileDan(list.find(x=>x.day===d), list)); }
-    catch(err){
-      console.error('Tile greška za dan',d,err);
-      const el=document.createElement('div'); el.className='tile';
-      el.innerHTML=`<div class="status lockb">GREŠKA</div>
-        <div class="tday">Dan ${d}</div>
-        <div class="ttitle">Nije moguće prikazati</div>
-        <div class="info">Proveri Sheet vrednosti za ovaj dan.</div>`;
-      g.appendChild(el);
-    }
-  }
+  const nextD = nextLockedDay(list); // timer prikazujemo samo za sledeći zaključani dan
+
+  // Dani 1..max
+  list.filter(x=>x.day>=1).forEach(it=>{
+    g.appendChild(tileDan(it,list,nextD));
+  });
 }
 
 function tileUvod(intro){
@@ -177,30 +220,46 @@ function tileUvod(intro){
     <div class="tday">Uvod</div><div class="ttitle">${intro.title||''}</div>
     <div class="info">Status: spremno</div>
     <div style="margin-top:8px"><button class="btn">Otvori</button></div>`;
-  el.querySelector('.btn').onclick=()=>openLesson(0,intro);
+  el.querySelector('.btn').onclick=()=>{ clickS(); openLesson(0,intro); };
   return el;
 }
 
-function tileDan(it, all){
+function tileDan(it, all, nextLocked){
   const d=Number(it.day)||0;
-  const unlock=isUnlocked(d,all);
+  const open = canOpen(it, all);
+  const isPrem = it.paidTier==='premium';
   const el=document.createElement('div'); el.className='tile';
-  el.innerHTML=`<div class="status ${unlock?'okb':'lockb'}">${unlock?'OTKLJUČANO':'ZAKLJUČANO'}</div>
+
+  const topBadges = [];
+  topBadges.push(`<div class="status ${open?'okb':'lockb'}">${open?'OTKLJUČANO':'ZAKLJUČANO'}</div>`);
+  if(isPrem) topBadges.push(`<div class="status premium">PREMIUM</div>`);
+
+  el.innerHTML=`
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${topBadges.join('')}</div>
     <div class="tday">Dan ${d}</div>
     <div class="ttitle">${it.title||('Dan '+d)}</div>
-    <div class="info">${unlock?(isDone(d)?'Status: završeno':'Status: spremno')
-      :'Status: zaključano · Klikni Dan 1 da pokreneš odbrojavanje'}</div>
-    <div style="margin-top:8px"><button class="btn" ${unlock?'':'disabled'}>Otvori</button></div>`;
-  if(unlock){ el.querySelector('.btn').onclick=()=>openLesson(d,it); }
-  else{
-    const s=S();
-    if(s.startedAt){
-      const info=el.querySelector('.info');
-      const cd=document.createElement('b'); cd.style.marginLeft='6px';
-      info.append(' · Otključava se za ', cd);
-      const tick=()=>{ const left=Math.max(0,(unlockAt(d,all)||0)-Date.now()); cd.textContent=timeLeft(left); if(left<=0){ render(all); } };
+    <div class="info">
+      ${open ? (isDone(d)?'Status: završeno':'Status: spremno')
+             : (isPrem && !hasPremium() ? 'Za pristup je potreban Premium'
+                : (nextLocked===d ? 'Otključava se za <b class="cd"></b>' : 'Zaključano'))}
+    </div>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" ${open?'':'disabled'}>Otvori</button>
+      ${(!open && isPrem && !hasPremium()) ? `<button class="btn gold buy">Otključaj Premium</button>`:''}
+    </div>`;
+
+  // Bez preview teksta na zaključanim danima
+  if(open){
+    el.querySelector('.btn').onclick=()=>{ clickS(); openLesson(d,it); };
+  }else{
+    const info=el.querySelector('.info');
+    const cd=el.querySelector('.cd');
+    if(cd && nextLocked===d){
+      const tick=()=>{ const left=Math.max(0,(unlockAt(d,all)||0)-Date.now()); cd.textContent=timeLeft(left); if(left<=0){ unlockS(); render(all); } };
       tick(); const iv=setInterval(()=>{ if(!document.body.contains(cd)) return clearInterval(iv); tick(); },1000);
     }
+    const buy=el.querySelector('.buy');
+    if(buy){ buy.onclick=()=>{ clickS(); window.open(PAYMENT_URL,'_blank'); }; }
   }
   return el;
 }
@@ -208,22 +267,28 @@ function tileDan(it, all){
 /*** 6) MODAL ***/
 let currentDay=null;
 function openLesson(day, it){
-  if(day===1){ ensureStarted(Number(it.lockedAfterHours)||12); setTimeout(()=>render(currentItems),0); }
+  if(day===1 && !S().startedAt){ ensureStarted(Number(it.lockedAfterHours)||12); setTimeout(()=>render(currentItems),0); }
   currentDay=day;
-  $('#ttl').textContent = day===0 ? 'Uvod' : (it.title||('Dan '+day));
-  $('#body').textContent = it.body||'Nema teksta.';
-  $('#nt').value = localStorage.getItem(LS+'_notes_'+day)||'';
-  $('#done').checked = isDone(day);
+  document.getElementById('ttl').textContent = day===0 ? 'Uvod' : (it.title||('Dan '+day));
+  document.getElementById('body').textContent = it.body||'Nema teksta.';
+  document.getElementById('nt').value = localStorage.getItem(LS+'_notes_'+day)||'';
+  document.getElementById('done').checked = isDone(day);
   show(true);
 }
-function show(v){ $('#ov').style.display=v?'block':'none'; const m=document.getElementById('md'); if(v){ m.classList.add('show'); m.style.display='flex'; }else{ m.classList.remove('show'); setTimeout(()=>m.style.display='none',160);} }
+function show(v){ document.getElementById('ov').style.display=v?'block':'none'; const m=document.getElementById('md'); if(v){ m.classList.add('show'); m.style.display='flex'; }else{ m.classList.remove('show'); setTimeout(()=>m.style.display='none',160);} }
 document.getElementById('close').onclick=()=>show(false);
-document.getElementById('done').onchange=e=>markDone(currentDay,e.target.checked);
+document.getElementById('done').onchange=e=>{ markDone(currentDay,e.target.checked); clickS(); } ;
 document.getElementById('nt').oninput=e=>localStorage.setItem(LS+'_notes_'+currentDay,e.target.value||'');
 
-/*** 7) INIT ***/
+/*** 7) PREMIUM UI ***/
+function updatePremState(){ document.getElementById('premState').textContent = hasPremium()?'Aktivan':'Nije aktivan'; }
+document.getElementById('buyBtn').onclick=()=>{ clickS(); window.open(PAYMENT_URL,'_blank'); };
+document.getElementById('proToggle').onclick=()=>{ setPremium(!hasPremium()); render(currentItems); clickS(); };
+
+/*** 8) INIT ***/
 let currentItems=FALLBACK;
 (async function(){
+  updatePremState();
   const items=await loadItems();
   currentItems=items;
   document.getElementById('status').textContent='Spremno';
